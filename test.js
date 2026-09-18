@@ -365,18 +365,18 @@ runTest('FPU: All bundled example programs assemble, run and halt', () => {
         assert.ok(steps < 5000, `${ex.title} no debe quedarse en un bucle`);
     }
     // Comprobaciones puntuales
-    const circle = makeSystem(EXAMPLES.find(e => e.id === 'circulo').code);
-    runUntilHalt(circle.cpu, circle.fpu);
-    assert.ok(Math.abs(circle.fpu.readFloat(circle.cpu, 0x2004) - Math.PI * 6.25) < 1e-4);
+    const suma = makeSystem(EXAMPLES.find(e => e.id === 'suma').code);
+    runUntilHalt(suma.cpu, suma.fpu);
+    assert.strictEqual(suma.fpu.readFloat(suma.cpu, 0x2008), 5.75);
 
-    const rnd = makeSystem(EXAMPLES.find(e => e.id === 'redondeo').code);
-    runUntilHalt(rnd.cpu, rnd.fpu);
-    const i16 = (a) => rnd.cpu.readMemory(a) | (rnd.cpu.readMemory(a + 1) << 8);
-    assert.deepStrictEqual([i16(0x2004), i16(0x2006), i16(0x2008), i16(0x200A)], [2, 2, 3, 2]);
+    const lat = makeSystem(EXAMPLES.find(e => e.id === 'latencia').code);
+    runUntilHalt(lat.cpu, lat.fpu);
+    assert.strictEqual(lat.cpu.registers.b, 0x00);
+    assert.strictEqual(lat.cpu.registers.a, 0xC3);
 
-    const cmp = makeSystem(EXAMPLES.find(e => e.id === 'comparar').code);
-    runUntilHalt(cmp.cpu, cmp.fpu);
-    assert.strictEqual(cmp.cpu.readMemory(0x2008), 1, '2.5 < 7.0 -> RESULT = 1');
+    const exc = makeSystem(EXAMPLES.find(e => e.id === 'excepciones').code);
+    runUntilHalt(exc.cpu, exc.fpu);
+    assert.deepStrictEqual([exc.fpu.exc.ze, exc.fpu.exc.ie, exc.fpu.exc.oe, exc.fpu.exc.pe], [true, true, true, true]);
 });
 
 console.log('All tests completed successfully!');
