@@ -1,4 +1,7 @@
-# Intel 8080 CPU Emulator & Assembler - Version 2.1.0
+# Intel 8080 CPU Emulator & Assembler + Coprocesador de Punto Flotante - Version 3.0.0
+
+> **Sitio web:** https://davidmayen04.github.io/8080/  
+> Fork de [alexeiiw/8080](https://github.com/alexeiiw/8080) que integra, de forma conceptual, un coprocesador de punto flotante (FPU) al Intel 8080.
 
 Bienvenidos al emulador y ensamblador de la arquitectura Intel 8080. Este proyecto ha sido construido desde cero utilizando tecnología 100% web pura (HTML5, CSS3 y Vanilla JavaScript) sin frameworks ni dependencias de ningún tipo, garantizando una carga instantánea y la máxima compatibilidad educativa.
 
@@ -20,6 +23,23 @@ En la enseñanza de la informática y la ingeniería de sistemas, existe una bre
     *   Las operaciones de pila (*Stack*) con seguimiento visual directo de la dirección apuntada por `SP`.
     *   La memoria RAM desglosada en un mapa bidimensional interactivo con localización instantánea.
 *   **Depuración Paso a Paso (*Debugging*):** Permite ejecutar programas instrucción por instrucción, deteniendo y analizando el procesador para encontrar errores de lógica con facilidad.
+
+---
+
+## 🧮 Novedades de la Versión 3.0.0: Coprocesador de Punto Flotante
+
+El Intel 8080 sólo opera con enteros de 8 bits. Esta versión le acopla un **coprocesador de punto flotante conceptual**, inspirado en el Intel 8087, para enseñar cómo un procesador delega operaciones en un chip especializado:
+
+- **Instrucción de escape (`ESC`, opcode `EDH`):** el CPU reconoce el prefijo, obtiene el opcode del coprocesador, calcula la dirección efectiva (2 bytes inmediatos o el par `HL` con el operando `M`) y entrega la operación por el bus.
+- **34 mnemónicos nuevos** en el ensamblador: `FLD`, `FST`, `FSTP`, `FILD`, `FIST`, `FISTP`, `FADD`, `FSUB`, `FMUL`, `FDIV`, `FSQRT`, `FSIN`, `FCOS`, `FTAN`, `FLN`, `FEXP`, `FCHS`, `FABS`, `FRNDINT`, `FXCH`, `FDUP`, `FPOP`, `FCOM`, `FCOMP`, `FTST`, `FSTSW`, `FLDCW`, `FLDZ`, `FLD1`, `FLDPI`, `FWAIT`, `FINIT`, `FCLEX`, y las directivas `DF` (float de 32 bits), `DW` (word) y `DS` (reservar).
+- **Pila de 8 registros IEEE 754 (precisión simple)** con puntero `TOP` y etiquetas (válido, cero, especial, vacío), tal como el 8087.
+- **Palabra de estado:** códigos de condición `C0..C3` (resultado de comparaciones) y excepciones `IE, DE, ZE, OE, UE, PE, SF`. **Palabra de control:** cuatro modos de redondeo (`FLDCW`).
+- **Latencia y sincronización:** cada operación tarda ciclos (suma 4, división 10, raíz 12, seno 20). El CPU sigue ejecutando instrucciones enteras en paralelo y sólo entra en `WAIT` si emite otro `ESC` mientras la línea `BUSY` está activa. `FWAIT` evita el riesgo de leer un resultado antes de que la FPU lo escriba.
+- **Panel gráfico del coprocesador:** diagrama de bus animado CPU ↔ FPU, pila de registros, decodificador IEEE 754 bit a bit (signo, exponente, mantisa, fórmula y bytes en memoria), LEDs de estado, traza de operaciones, contadores de ciclos/esperas, interruptores para desconectar el coprocesador o desactivar la latencia, y un inspector de floats en la vista de memoria.
+- **11 programas de ejemplo** cargables desde el editor (suma, área de un círculo, Celsius→Fahrenheit, hipotenusa, promedio de un arreglo, comparación y salto, excepciones, riesgo de datos con `FWAIT`, trigonometría, modos de redondeo).
+- **9 pruebas unitarias nuevas** en `test.js` (`node test.js`).
+
+Consulta el capítulo 6 de `INSTRUCTIONS.md` para la guía paso a paso y la sección "¿Cómo se integra el coprocesador?" del sitio para el modelo arquitectónico.
 
 ---
 
@@ -67,8 +87,19 @@ Para utilizar el emulador de forma local en tu máquina o para desarrollo:
 
 ## 📝 Documentación Recomendada
 
-*   **`INSTRUCTIONS.md`:** Nuestro libro didáctico interactivo diseñado específicamente para que los estudiantes de alto nivel aprendan el funcionamiento práctico del ensamblador paso a paso, con guías estructuradas de aritmética, ciclos, condicionales y la pila.
+*   **`INSTRUCTIONS.md`:** Nuestro libro didáctico interactivo diseñado específicamente para que los estudiantes de alto nivel aprendan el funcionamiento práctico del ensamblador paso a paso, con guías estructuradas de aritmética, ciclos, condicionales, la pila y el coprocesador de punto flotante.
+
+## 🗂️ Estructura del código
+
+| Archivo | Contenido |
+|---|---|
+| `cpu.js` | Núcleo del Intel 8080. Incluye el opcode `ESC` (`EDH`), el reloj de ciclos y la lógica de `WAIT` frente al coprocesador. |
+| `fpu.js` | Coprocesador de punto flotante: pila de registros, aritmética IEEE 754, palabra de estado/control, latencias y protocolo con el CPU. |
+| `assembler.js` | Ensamblador de dos pasadas con los mnemónicos `F…` y las directivas `DF`, `DW`, `DS`. |
+| `examples.js` | Programas de ejemplo que se cargan desde el editor. |
+| `main.js` | Interfaz: paneles del CPU y del coprocesador, diagrama de bus, decodificador IEEE 754. |
+| `test.js` | Pruebas unitarias (`node test.js`). |
 
 ---
-**Versión del Proyecto:** 2.1.0
+**Versión del Proyecto:** 3.0.0
 **Licencia:** MIT

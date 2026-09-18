@@ -5,7 +5,18 @@
     --secondary-color: #64748b;
     --text-color: #1e293b;
     --border-color: #e2e8f0;
+    --fpu-color: #7c3aed;
+    --fpu-soft: #ede9fe;
+    --sign-color: #dc2626;
+    --exp-color: #2563eb;
+    --man-color: #d97706;
+    --ok-color: #16a34a;
+    --warn-color: #d97706;
+    --err-color: #dc2626;
+    --mono: 'Courier New', Courier, monospace;
 }
+
+* { box-sizing: border-box; }
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,45 +24,94 @@ body {
     color: var(--text-color);
     margin: 0;
     padding: 0;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    height: 100vh;
 }
 
+/* ---------- Cabecera ---------- */
+
 header {
-    background-color: var(--primary-color);
+    background: linear-gradient(90deg, var(--primary-color), #4f46e5 60%, var(--fpu-color));
     color: white;
-    padding: 1rem 2rem;
+    padding: 0.9rem 1.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 header h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
 }
 
 .header-container {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
-.version-badge {
+.version-badge, .fpu-badge {
     background-color: rgba(255, 255, 255, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.4);
     color: white;
-    padding: 0.25rem 0.6rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 9999px;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     font-weight: bold;
 }
 
-main {
+.header-nav {
+    margin-left: auto;
     display: flex;
-    flex: 1;
-    padding: 1rem;
+    gap: 0.5rem;
+}
+
+.header-nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.12);
+}
+
+.header-nav a:hover { background: rgba(255,255,255,0.25); }
+
+/* ---------- Layout ---------- */
+
+main {
+    display: grid;
+    grid-template-columns: minmax(300px, 1fr) minmax(420px, 1.5fr) minmax(440px, 1.6fr);
+    grid-template-areas:
+        "editor cpu fpu"
+        "arch arch arch";
     gap: 1rem;
-    overflow: hidden;
+    padding: 1rem;
+    flex: 1;
+    align-items: start;
+    align-content: start;
+}
+
+#editor-section { grid-area: editor; }
+#emulator-section { grid-area: cpu; }
+#fpu-section { grid-area: fpu; }
+#arch-section { grid-area: arch; }
+
+@media (max-width: 1400px) {
+    main {
+        grid-template-columns: minmax(300px, 1fr) minmax(420px, 1.5fr);
+        grid-template-areas:
+            "editor cpu"
+            "fpu fpu"
+            "arch arch";
+    }
+}
+
+@media (max-width: 900px) {
+    main {
+        grid-template-columns: 1fr;
+        grid-template-areas: "editor" "cpu" "fpu" "arch";
+    }
 }
 
 section {
@@ -61,41 +121,67 @@ section {
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     padding: 1rem;
-}
-
-#editor-section {
-    flex: 1;
-}
-
-#emulator-section {
-    flex: 2;
-    overflow-y: auto;
+    min-width: 0;
 }
 
 h2 {
     margin-top: 0;
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     border-bottom: 2px solid var(--bg-color);
     padding-bottom: 0.5rem;
 }
 
-textarea {
+h2 small {
+    font-size: 0.8rem;
+    color: var(--secondary-color);
+    font-weight: normal;
+}
+
+#fpu-section h2 { border-bottom-color: var(--fpu-soft); }
+
+code {
+    font-family: var(--mono);
+    background: #f1f5f9;
+    padding: 0 3px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* ---------- Editor ---------- */
+
+.examples-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.examples-row select {
     flex: 1;
+    padding: 0.35rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: white;
+}
+
+textarea {
     width: 100%;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
+    height: 380px;
+    font-family: var(--mono);
+    font-size: 13px;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    resize: none;
-    box-sizing: border-box;
+    resize: vertical;
 }
 
 .controls {
     display: flex;
     gap: 0.5rem;
-    margin: 1rem 0;
+    margin: 0.75rem 0;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 button {
@@ -109,19 +195,19 @@ button {
     transition: opacity 0.2s;
 }
 
-button:hover {
-    opacity: 0.9;
-}
+button:hover { opacity: 0.9; }
 
 button:disabled {
     background-color: var(--secondary-color);
     cursor: not-allowed;
 }
 
-.btn-clear {
-    background-color: var(--secondary-color);
-    color: white;
-    cursor: pointer;
+.btn-clear { background-color: var(--secondary-color); }
+
+.btn-small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    background: var(--fpu-color);
 }
 
 #status-badge {
@@ -130,12 +216,54 @@ button:disabled {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     background: #e2e8f0;
+    font-size: 0.85rem;
 }
+
+#assembler-output {
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    min-height: 1.5rem;
+}
+
+.error { color: #dc2626; background: #fee2e2; }
+.success { color: #16a34a; background: #f0fdf4; }
+
+.reference {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.5rem;
+}
+
+.reference summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--fpu-color);
+}
+
+.reference table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.reference th, .reference td {
+    border: 1px solid var(--border-color);
+    padding: 3px 5px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.reference th { background: var(--fpu-soft); }
+
+/* ---------- CPU ---------- */
 
 .cpu-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr;
     gap: 1rem;
 }
 
@@ -143,13 +271,16 @@ button:disabled {
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 0.75rem;
+    background: white;
 }
 
 .card h3 {
     margin: 0 0 0.75rem 0;
-    font-size: 1rem;
+    font-size: 0.95rem;
     color: var(--secondary-color);
 }
+
+.card h3 small { font-weight: normal; font-size: 0.8rem; }
 
 .reg-row, .flags-row {
     display: flex;
@@ -163,37 +294,54 @@ button:disabled {
     border-radius: 4px;
     text-align: center;
     background: #f8fafc;
+    min-width: 0;
 }
 
 .reg-box span, .flag-box span {
     display: block;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--secondary-color);
     padding: 2px 0;
     background: #f1f5f9;
 }
 
 .reg-box div, .flag-box div {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--mono);
     font-weight: bold;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     padding: 4px 0;
 }
 
-.reg-box.extended {
-    flex: 2;
-}
+.reg-box.extended { flex: 2; }
 
-.memory {
-    grid-column: span 2;
-}
+.reg-row.counters .reg-box div { font-size: 0.95rem; color: var(--fpu-color); }
+
+.memory { grid-column: span 2; }
 
 .mem-controls {
     margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    flex-wrap: wrap;
 }
 
+.mem-controls input, .float-inspector input, .ieee-input input {
+    font-family: var(--mono);
+    padding: 0.3rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.mem-legend { margin-left: auto; font-size: 0.75rem; color: var(--secondary-color); }
+.mem-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 2px 0 6px; vertical-align: middle; }
+.lg-pc { background: #fde047; }
+.lg-read { background: #bfdbfe; }
+.lg-write { background: #c4b5fd; }
+
 #memory-table {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--mono);
     font-size: 12px;
     display: grid;
     grid-template-columns: auto repeat(16, 1fr);
@@ -208,35 +356,25 @@ button:disabled {
     text-align: center;
 }
 
-.mem-header {
-    background: #f1f5f9;
-    font-weight: bold;
-}
+.mem-header { background: #f1f5f9; font-weight: bold; }
+.mem-addr { background: #f1f5f9; padding: 2px 5px; font-weight: bold; }
+.mem-fpu-read { background: #bfdbfe; }
+.mem-fpu-write { background: #c4b5fd; }
+.mem-pc { background: #fde047 !important; }
 
-.mem-addr {
-    background: #f1f5f9;
-    padding: 2px 5px;
-    font-weight: bold;
-}
-
-#assembler-output {
+.float-inspector {
     margin-top: 0.5rem;
     font-size: 0.85rem;
-    padding: 0.5rem;
-    border-radius: 4px;
-}
-
-.error { color: #dc2626; background: #fee2e2; }
-.success { color: #16a34a; background: #f0fdf4; }
-
-.dashboard-right {
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
+
+.dashboard-right { display: flex; flex-direction: column; gap: 1rem; }
 
 #stack-table {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: var(--mono);
     font-size: 13px;
     display: flex;
     flex-direction: column;
@@ -253,16 +391,234 @@ button:disabled {
 }
 
 .stack-row.active {
-    background-color: #fde047; /* Yellow highlight for SP */
+    background-color: #fde047;
     border-color: #eab308;
     font-weight: bold;
 }
 
-.stack-addr {
-    color: var(--secondary-color);
-    white-space: pre;
+.stack-addr { color: var(--secondary-color); white-space: pre; }
+.stack-val { font-weight: bold; }
+
+/* ---------- Coprocesador ---------- */
+
+.fpu-controls { font-size: 0.9rem; }
+
+.toggle { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+
+.fpu-status {
+    margin-left: auto;
+    font-weight: bold;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
 }
 
-.stack-val {
+.fpu-status.idle { background: #f0fdf4; color: var(--ok-color); }
+.fpu-status.busy { background: #fef3c7; color: var(--warn-color); }
+.fpu-status.wait { background: #fee2e2; color: var(--err-color); }
+.fpu-status.off { background: #e2e8f0; color: var(--secondary-color); }
+
+.bus-card { margin-bottom: 1rem; }
+
+#bus-diagram {
+    width: 100%;
+    height: auto;
+    display: block;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+#bus-diagram .chip rect {
+    fill: #eff6ff;
+    stroke: var(--primary-color);
+    stroke-width: 2;
+    transition: fill 0.3s;
+}
+
+#bus-diagram .chip.fpu rect { fill: var(--fpu-soft); stroke: var(--fpu-color); }
+#bus-diagram .chip.pulse rect { fill: #ddd6fe; }
+#bus-diagram.stalled #bus-cpu rect { fill: #fee2e2; stroke: var(--err-color); }
+#bus-diagram.fpu-off .chip.fpu rect { fill: #f1f5f9; stroke: var(--secondary-color); stroke-dasharray: 6 4; }
+
+#bus-diagram .chip-title { font-size: 13px; font-weight: bold; text-anchor: middle; fill: var(--text-color); }
+#bus-diagram .chip-line { font-size: 11px; text-anchor: middle; fill: var(--text-color); font-family: var(--mono); }
+#bus-diagram .chip-state { font-size: 12px; font-weight: bold; text-anchor: middle; fill: var(--ok-color); letter-spacing: 1px; }
+#bus-diagram.stalled #bus-cpu-state { fill: var(--err-color); }
+#bus-diagram.busy #bus-fpu-state { fill: var(--warn-color); }
+#bus-diagram.fpu-off #bus-fpu-state { fill: var(--secondary-color); }
+
+#bus-diagram .bus-line line {
+    stroke: #94a3b8;
+    stroke-width: 2.5;
+    color: #94a3b8;
+    transition: stroke 0.2s;
+}
+
+#bus-diagram .bus-line .line-label {
+    font-size: 10px;
+    text-anchor: middle;
+    fill: var(--secondary-color);
+}
+
+#bus-diagram .bus-line.active line { stroke: var(--fpu-color); color: var(--fpu-color); stroke-width: 3.5; }
+#bus-diagram .bus-line.stalled line { stroke: var(--err-color); color: var(--err-color); stroke-width: 3.5; }
+#bus-diagram .bus-line.ignored line { stroke: var(--secondary-color); color: var(--secondary-color); stroke-dasharray: 5 5; }
+
+#bus-diagram .packet.esc { fill: var(--fpu-color); }
+#bus-diagram .packet.data { fill: var(--primary-color); }
+#bus-diagram .packet.wait { fill: var(--err-color); }
+
+.fpu-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.fpu-stack-card, .trace-card { min-width: 0; }
+.ieee-card, .trace-card { grid-column: 1 / -1; }
+
+@media (max-width: 1100px) {
+    .fpu-grid { grid-template-columns: 1fr; }
+}
+
+.hint { font-size: 0.75rem; color: var(--secondary-color); margin: 0.5rem 0 0; }
+
+#fpu-stack { display: flex; flex-direction: column; gap: 3px; font-family: var(--mono); font-size: 12.5px; }
+
+.st-row {
+    display: grid;
+    grid-template-columns: 62px 28px 58px 1fr 84px;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.st-row:hover { background: #f1f5f9; }
+.st-row.top { background: var(--fpu-soft); border-color: var(--fpu-color); font-weight: bold; }
+.st-row.empty { color: #94a3b8; }
+.st-row.written { box-shadow: inset 3px 0 0 var(--fpu-color); }
+.st-row.selected { outline: 2px solid var(--fpu-color); }
+.st-name { color: var(--fpu-color); }
+.st-phys { color: var(--secondary-color); font-size: 11px; }
+.st-tag { font-size: 10px; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; text-align: center; }
+.tag-0 { background: #dcfce7; color: #166534; }
+.tag-1 { background: #e0f2fe; color: #075985; }
+.tag-2 { background: #fee2e2; color: #991b1b; }
+.tag-3 { background: #e2e8f0; color: #475569; }
+.st-val { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-hex { color: var(--secondary-color); font-size: 11px; text-align: right; }
+
+/* IEEE 754 */
+
+.ieee-input { display: flex; gap: 0.5rem; align-items: center; font-size: 0.85rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+.ieee-input input { width: 130px; }
+
+.ieee-bits {
+    display: grid;
+    grid-template-columns: repeat(32, 1fr);
+    gap: 1px;
+    font-family: var(--mono);
+    font-size: 12px;
     font-weight: bold;
+    margin-bottom: 0.4rem;
+}
+
+.bit {
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 2px;
+    color: white;
+}
+
+.bit-sign { background: var(--sign-color); }
+.bit-exp { background: var(--exp-color); }
+.bit-man { background: var(--man-color); }
+.bit.group-start { margin-left: 3px; }
+
+.ieee-legend { display: flex; gap: 0.75rem; font-size: 0.72rem; color: var(--secondary-color); flex-wrap: wrap; margin-bottom: 0.5rem; }
+.ieee-legend i, .ieee-detail i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.sw-sign { background: var(--sign-color); }
+.sw-exp { background: var(--exp-color); }
+.sw-man { background: var(--man-color); }
+
+.ieee-detail { font-size: 0.8rem; display: flex; flex-direction: column; gap: 3px; word-break: break-word; }
+.ieee-detail code { font-size: 0.85rem; }
+
+/* Palabra de estado */
+
+.led-group { margin-bottom: 0.6rem; }
+.led-title { font-size: 0.75rem; color: var(--secondary-color); margin-bottom: 0.3rem; }
+.leds { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+.led {
+    flex: 1;
+    min-width: 44px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    text-align: center;
+    background: #f8fafc;
+    padding: 3px 2px;
+    cursor: help;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.led span { display: block; font-size: 0.7rem; color: var(--secondary-color); }
+.led b { display: block; font-size: 0.7rem; font-weight: 600; color: #94a3b8; }
+.led.on { background: #dcfce7; border-color: var(--ok-color); }
+.led.on span, .led.on b { color: #166534; }
+.led.exc.on { background: #fee2e2; border-color: var(--err-color); }
+.led.exc.on span, .led.exc.on b { color: #991b1b; }
+
+.control-row { display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem; flex-wrap: wrap; }
+.control-row select { padding: 0.25rem; border: 1px solid var(--border-color); border-radius: 4px; }
+
+/* Traza */
+
+#fpu-trace {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 330px;
+    overflow-y: auto;
+}
+
+.tr-row { display: flex; gap: 6px; padding: 2px 5px; border-radius: 3px; border-left: 3px solid transparent; }
+.tr-cycle { color: var(--secondary-color); min-width: 30px; text-align: right; }
+.tr-text { white-space: pre-wrap; }
+.tr-issue { border-left-color: var(--fpu-color); background: #faf5ff; }
+.tr-done { border-left-color: var(--ok-color); background: #f0fdf4; }
+.tr-stall { border-left-color: var(--err-color); background: #fef2f2; }
+.tr-warn { border-left-color: var(--warn-color); background: #fffbeb; }
+.tr-empty { color: var(--secondary-color); font-family: 'Segoe UI', sans-serif; font-size: 0.85rem; }
+
+/* ---------- Arquitectura ---------- */
+
+.arch-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 900px) { .arch-grid { grid-template-columns: 1fr; } }
+
+.arch-text h3 { font-size: 1rem; color: var(--fpu-color); margin: 0.75rem 0 0.25rem; }
+.arch-text p { margin: 0.25rem 0 0.75rem; }
+
+.format-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; margin: 0.25rem 0 0.75rem; }
+.format-table th, .format-table td { border: 1px solid var(--border-color); padding: 3px 6px; text-align: left; }
+.format-table th { background: var(--fpu-soft); }
+
+footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--secondary-color);
+    padding: 0.75rem;
 }

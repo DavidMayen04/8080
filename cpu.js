@@ -1,10 +1,20 @@
 class Intel8080 {
     constructor() {
         this.memory = new Uint8Array(65536);
+        this.fpu = null;        // Coprocesador de punto flotante (opcional)
         this.reset();
     }
 
+    // Conecta un coprocesador al bus. El CPU delegará en él las
+    // instrucciones precedidas por el opcode de escape ESC (0xED).
+    attachFPU(fpu) {
+        this.fpu = fpu;
+    }
+
     reset() {
+        this.cycles = 0;        // instrucciones ejecutadas (reloj conceptual)
+        this.stalled = false;   // true mientras el CPU espera al coprocesador
+        if (this.fpu) this.fpu.reset();
         this.registers = {
             a: 0,
             b: 0,
@@ -132,7 +142,26 @@ class Intel8080 {
     }
 
     step() {
-        if (this.halted) return;
+        if (this.halted) {
+            // Un HLT no detiene al coprocesador: termina su operación pendiente.
+            if (this.fpu && this.fpu.busy > 0) this.fpu.tick();
+            return;
+        }
+        this.cycles++;
+        if (this.fpu) {
+            this.fpu.tick();
+            // Protocolo de sincronización: si el coprocesador aún está ocupado
+            // (línea BUSY activa) y la siguiente instrucción es un ESC, o el CPU
+            // está esperando un dato que la FPU le enviará (FIST rp, FSTSW),
+            // el CPU espera (WAIT) sin avanzar el PC.
+            if (this.fpu.busy > 0 && this.fpu.enabled &&
+                (this.fpu.implicitWait || this.readMemory(this.registers.pc) === 0xED)) {
+                this.fpu.stall(this, !this.stalled);
+                this.stalled = true;
+                return;
+            }
+            this.stalled = false;
+        }
         const opcode = this.fetch();
         this.execute(opcode);
     }
@@ -270,6 +299,14 @@ class Intel8080 {
             case 0xD3: this.fetch(); break; // OUT (Ignored for now)
             case 0xFB: break; // EI
             case 0xF3: break; // DI
+
+            // ESC: escape hacia el coprocesador de punto flotante.
+            // El CPU obtiene el opcode del coprocesador y la dirección efectiva
+            // (si aplica) y le entrega la operación. Si el coprocesador está
+            // desconectado del bus, consume los bytes y actúa como NOP.
+            case 0xED:
+                if (this.fpu) this.fpu.execute(this);
+                break;
         }
     }
 

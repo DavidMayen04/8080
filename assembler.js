@@ -82,6 +82,81 @@ class Assembler8080 {
         };
         this.regs = { 'B': 0, 'C': 1, 'D': 2, 'E': 3, 'H': 4, 'L': 5, 'M': 6, 'A': 7 };
         this.rps = { 'B': 0, 'C': 0, 'D': 1, 'E': 1, 'H': 2, 'L': 2, 'SP': 3, 'PSW': 3, 'BC': 0, 'DE': 1, 'HL': 2 };
+
+        // --- Coprocesador de punto flotante ---
+        // Todas las instrucciones FPU se codifican como ESC (0xED) + opcode FPU
+        // [+ dirección de 16 bits | + inmediato de 8 bits].
+        this.ESC = 0xED;
+        this.fpuMem = { 'FLD': 0x00, 'FST': 0x01, 'FSTP': 0x02, 'FILD': 0x03, 'FIST': 0x04, 'FISTP': 0x05,
+            'FADD': 0x06, 'FSUB': 0x07, 'FMUL': 0x08, 'FDIV': 0x09, 'FCOM': 0x0A, 'FSTSW': 0x0B };
+        this.fpuStack = { 'FADD': 0x80, 'FSUB': 0x81, 'FMUL': 0x82, 'FDIV': 0x83, 'FSQRT': 0x84, 'FCHS': 0x85,
+            'FABS': 0x86, 'FSIN': 0x87, 'FCOS': 0x88, 'FTAN': 0x89, 'FRNDINT': 0x8A, 'FLN': 0x8B, 'FEXP': 0x8C,
+            'FXCH': 0x90, 'FCOM': 0x91, 'FCOMP': 0x92, 'FTST': 0x93, 'FSTSW': 0x94, 'FWAIT': 0x95,
+            'FINIT': 0x96, 'FCLEX': 0x97, 'FLDCW': 0x98, 'FLDZ': 0x99, 'FLD1': 0x9A, 'FLDPI': 0x9B,
+            'FDUP': 0x9C, 'FPOP': 0x9D };
+        this.fpuIntRP = { 'FILD': 0x10, 'FIST': 0x14, 'FISTP': 0x18 };
+        this.fpuPairs = { 'B': 0, 'BC': 0, 'D': 1, 'DE': 1, 'H': 2, 'HL': 2 };
+    }
+
+    isFPU(mnemonic) {
+        return this.fpuMem[mnemonic] !== undefined || this.fpuStack[mnemonic] !== undefined;
+    }
+
+    // Determina la forma de una instrucción FPU a partir de su operando.
+    fpuForm(mnemonic, tokens) {
+        const operand = tokens[1] ? tokens[1].toUpperCase() : null;
+        if (mnemonic === 'FLDCW') {
+            if (!operand) throw new Error('FLDCW requiere un valor inmediato (modo de redondeo 0-3)');
+            return 'imm';
+        }
+        if (!operand) {
+            if (this.fpuStack[mnemonic] === undefined) throw new Error(`${mnemonic} requiere un operando (dirección, M o par de registros)`);
+            return 'stack';
+        }
+        if (this.fpuMem[mnemonic] === undefined) throw new Error(`${mnemonic} no acepta operandos`);
+        if (operand === 'M') return 'hl';
+        if (this.fpuIntRP[mnemonic] !== undefined && this.fpuPairs[operand] !== undefined) return 'rp';
+        return 'addr';
+    }
+
+    fpuSize(mnemonic, tokens) {
+        switch (this.fpuForm(mnemonic, tokens)) {
+            case 'addr': return 4;
+            case 'imm': return 3;
+            default: return 2;
+        }
+    }
+
+    fpuEncode(mnemonic, tokens, labels) {
+        const form = this.fpuForm(mnemonic, tokens);
+        const operand = tokens[1] ? tokens[1].toUpperCase() : null;
+        switch (form) {
+            case 'stack': return [this.ESC, this.fpuStack[mnemonic]];
+            case 'hl': return [this.ESC, 0x40 | this.fpuMem[mnemonic]];
+            case 'rp': return [this.ESC, this.fpuIntRP[mnemonic] | this.fpuPairs[operand]];
+            case 'imm': {
+                const v = this.parseValue(tokens[1], labels);
+                if (v < 0 || v > 3) throw new Error(`FLDCW: modo de redondeo inválido ${tokens[1]} (use 0-3)`);
+                return [this.ESC, this.fpuStack[mnemonic], v & 0xFF];
+            }
+            case 'addr': {
+                const addr = this.parseValue(tokens[1], labels);
+                return [this.ESC, this.fpuMem[mnemonic], addr & 0xFF, (addr >> 8) & 0xFF];
+            }
+        }
+    }
+
+    parseFloat32(tok) {
+        if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(tok)) {
+            throw new Error(`Valor de punto flotante inválido: ${tok}`);
+        }
+        return parseFloat(tok);
+    }
+
+    floatBytes(v) {
+        const b = new Uint8Array(4);
+        new DataView(b.buffer).setFloat32(0, v, true);
+        return Array.from(b);
     }
 
     assemble(source) {
@@ -116,6 +191,27 @@ class Assembler8080 {
                 currentPC += tokens.length - 1;
                 return { type: 'data', mnemonic, tokens, pc };
             }
+            if (mnemonic === 'DW') { // Define Word: enteros de 16 bits (little-endian)
+                const pc = currentPC;
+                currentPC += (tokens.length - 1) * 2;
+                return { type: 'data', mnemonic, tokens, pc };
+            }
+            if (mnemonic === 'DF') { // Define Float: IEEE 754 de 32 bits (little-endian)
+                const pc = currentPC;
+                currentPC += (tokens.length - 1) * 4;
+                return { type: 'data', mnemonic, tokens, pc };
+            }
+            if (mnemonic === 'DS') { // Define Storage: reserva n bytes
+                const pc = currentPC;
+                currentPC += this.parseValue(tokens[1]);
+                return { type: 'directive', mnemonic, tokens, pc };
+            }
+            if (this.isFPU(mnemonic)) {
+                const pc = currentPC;
+                const size = this.fpuSize(mnemonic, tokens);
+                currentPC += size;
+                return { type: 'fpu', mnemonic, tokens, pc, info: { bytes: size } };
+            }
 
             const info = this.opcodes[mnemonic];
             if (!info) throw new Error(`Unknown mnemonic: ${mnemonic}`);
@@ -133,8 +229,18 @@ class Assembler8080 {
             let pc = line.pc;
             if (line.type === 'data') {
                 for (let i = 1; i < line.tokens.length; i++) {
-                    binary[pc++] = this.parseValue(line.tokens[i], labels);
+                    if (line.mnemonic === 'DF') {
+                        for (const b of this.floatBytes(this.parseFloat32(line.tokens[i]))) binary[pc++] = b;
+                    } else if (line.mnemonic === 'DW') {
+                        const v = this.parseValue(line.tokens[i], labels);
+                        binary[pc++] = v & 0xFF;
+                        binary[pc++] = (v >> 8) & 0xFF;
+                    } else {
+                        binary[pc++] = this.parseValue(line.tokens[i], labels);
+                    }
                 }
+            } else if (line.type === 'fpu') {
+                for (const b of this.fpuEncode(line.mnemonic, line.tokens, labels)) binary[pc++] = b;
             } else {
                 const code = this.generateOpcode(line, labels);
                 binary[pc++] = code.byte1;

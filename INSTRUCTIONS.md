@@ -16,6 +16,7 @@ En este manual, no asumimos que sepas nada sobre electrónica o lenguaje ensambl
 4. [Capítulo 3: Segundo Grupo - Estructuras de Control y Lógica de Bits](#capítulo-3-segundo-grupo---estructuras-de-control-y-lógica-de-bits)
 5. [Capítulo 4: Tercer Grupo - Operando la Pila (Stack) y Funciones](#capítulo-4-tercer-grupo---operando-la-pila-stack-y-funciones)
 6. [Capítulo 5: Desafío Avanzado - Operaciones de 16 Bits en un CPU de 8 Bits](#capítulo-5-desafío-avanzado---operaciones-de-16-bits-en-un-cpu-de-8-bits)
+7. [Capítulo 6: El Coprocesador de Punto Flotante](#capítulo-6-el-coprocesador-de-punto-flotante)
 
 ---
 
@@ -466,6 +467,196 @@ SHLD 2000H         ; Guarda el resultado en las posiciones 2000H y 2001H
 HLT
 ```
 
-¡Felicidades! Has completado el recorrido completo por el funcionamiento interno del microprocesador. Ahora tienes la capacidad intelectual y práctica de diseñar programas de gran rendimiento, depurar flujos paso a paso y, lo más importante, comprender exactamente cómo interactúa el software de alto nivel con el hardware subyacente.
+---
+
+## Capítulo 6: El Coprocesador de Punto Flotante
+
+Hasta aquí todo lo que calculamos fueron **enteros**. Pero `3.14`, `-0.5` o `1e30` no caben en un registro de 8 bits, y emular sumas y divisiones decimales con instrucciones enteras costaría cientos de instrucciones por operación. La solución histórica fue añadir un segundo chip especializado: el **coprocesador de punto flotante** (en los PC de los años 80, el Intel 8087 acompañaba al 8086). Este simulador integra uno, de forma conceptual, al 8080.
+
+### 6.1 ¿Cómo hablan el CPU y el coprocesador?
+
+En un lenguaje de alto nivel escribirías `area = 3.1416 * r * r` y la máquina virtual se encargaría de todo. En hardware el reparto de tareas es explícito:
+
+1. **Prefijo de escape.** El 8080 no tiene instrucciones flotantes. Se reserva el opcode `EDH` como `ESC`: cuando el CPU lo lee, sabe que la siguiente instrucción no es suya. El ensamblador genera ese prefijo automáticamente para todos los mnemónicos que empiezan por `F`.
+2. **El CPU es el intermediario con la memoria.** Lee el opcode del coprocesador y, si hay un operando en memoria, calcula la dirección (2 bytes inmediatos, o el par `HL` cuando escribes `M`) y trae los 4 bytes del dato por el bus.
+3. **La FPU trabaja en paralelo.** Cada operación tarda un número de ciclos (suma 4, división 10, raíz 12, seno 20). Mientras tanto activa su línea `BUSY` y el CPU **sigue ejecutando instrucciones enteras**.
+4. **Sincronización.** Si el CPU llega a otro `ESC` mientras `BUSY` está activa, se detiene (`WAIT`) hasta que la FPU termine. La instrucción `FWAIT` provoca esa espera a propósito.
+
+Observa el diagrama "Bus CPU ↔ FPU" del panel del coprocesador mientras ejecutas paso a paso: verás viajar la instrucción, los datos y la señal de espera.
+
+### 6.2 Números reales en 32 bits: IEEE 754
+
+Un float ocupa 4 bytes y se descompone en tres campos: **signo** (1 bit), **exponente** (8 bits, con sesgo 127) y **mantisa** (23 bits, con un `1.` implícito). El valor es `(−1)^S × 1.M × 2^(E − 127)`. Por ejemplo `-6.25` = `C0C80000H`: signo 1, exponente 129 (→ 2²), mantisa 1.5625.
+
+La directiva `DF` escribe esos 4 bytes en memoria (en orden little-endian, como las direcciones del 8080). Escribe cualquier número en la casilla "Probar valor" del panel IEEE 754 para ver sus bits.
+
+```assembly
+DATOS: DF 3.5, -6.25, 1e30    ; tres floats consecutivos (12 bytes)
+ENTERO: DW 1000               ; entero de 16 bits (2 bytes)
+RESULT: DS 4                  ; reserva 4 bytes vacíos
+```
+
+### 6.3 La pila de registros
+
+La FPU no tiene registros con nombre propio como `A` o `B`, sino una **pila de 8 registros**. `ST(0)` es siempre la cima, `ST(1)` el siguiente, etc. Cargar un valor (`FLD`) lo apila; guardar con `FSTP` lo desapila. Las operaciones sin operando combinan `ST(1)` con `ST(0)`, desapilan ambos y apilan el resultado: exactamente la notación polaca inversa de una calculadora HP.
+
+```assembly
+; --- SUMA DE DOS NÚMEROS REALES ---
+ORG 0000H
+    FLD X        ; ST(0) = 3.5
+    FLD Y        ; ST(0) = 2.25, ST(1) = 3.5
+    FADD         ; ST(0) = 3.5 + 2.25 = 5.75 (la pila baja a 1 elemento)
+    FSTP RES     ; escribe 5.75 en RES (4 bytes) y desapila
+    FWAIT        ; espera a que la FPU termine de escribir
+    HLT
+
+ORG 2000H
+X:   DF 3.5
+Y:   DF 2.25
+RES: DS 4
+```
+
+Ejecuta paso a paso y observa la pila del coprocesador: `TOP` baja de 0 a 7 y 6 con cada `FLD` (la pila crece hacia abajo, como la del CPU) y vuelve a subir con `FADD` y `FSTP`. Usa "Ver float en: 2008" para interpretar los 4 bytes del resultado.
+
+### 6.4 Mezclar enteros y reales
+
+Los registros del CPU siguen siendo enteros. `FILD` convierte un entero de 16 bits (en memoria o en un par `BC`/`DE`/`HL`) a float; `FIST` hace el camino inverso redondeando según el modo de la palabra de control.
+
+```assembly
+; --- CELSIUS A FAHRENHEIT: F = C × 1.8 + 32 ---
+ORG 0000H
+    LXI HL, 37       ; 37 °C como entero
+    FILD HL          ; ST(0) = 37.0
+    FMUL FACTOR      ; ST(0) = 66.6     (operando directamente desde memoria)
+    FADD OFFSET      ; ST(0) = 98.6
+    FST FAHR         ; guarda el float (sin desapilar)
+    FISTP BC         ; BC = 99 (redondeado) y desapila
+    FWAIT
+    HLT
+
+ORG 2000H
+FACTOR: DF 1.8
+OFFSET: DF 32.0
+FAHR:   DS 4
+```
+
+### 6.5 Recorrer un arreglo de floats
+
+Un float mide 4 bytes, así que el puntero avanza de 4 en 4. `FADD M` suma el float apuntado por `HL`.
+
+```assembly
+; --- PROMEDIO DE 4 VALORES ---
+ORG 0000H
+    LXI HL, DATOS    ; puntero al primer float
+    LXI DE, 4        ; tamaño de un float
+    MVI C, 4         ; contador
+    FLDZ             ; acumulador ST(0) = 0.0
+BUCLE:
+    FADD M           ; ST(0) += [HL]
+    DAD DE           ; HL += 4
+    DCR C
+    JNZ BUCLE
+    FILD CANT        ; apila 4.0
+    FDIV             ; ST(0) = suma / 4
+    FSTP PROM
+    FWAIT
+    HLT
+
+ORG 2000H
+DATOS: DF 1.5, 2.5, 3.5, 4.5
+CANT:  DW 4
+PROM:  DS 4
+```
+
+### 6.6 Condicionales con números reales
+
+El CPU no puede leer las banderas de la FPU directamente: hay que copiar la palabra de estado al acumulador con `FSTSW`. `C3` (igual) queda en el bit 6 y `C0` (menor) en el bit 0, así que se prueban con `ANI` como cualquier bandera.
+
+```assembly
+; --- if (X < Y) A = 1; else if (X == Y) A = 2; else A = 0 ---
+ORG 0000H
+    FLD Y
+    FLD X            ; ST(0) = X, ST(1) = Y
+    FCOM             ; compara ST(0) con ST(1)
+    FSTSW            ; A = códigos de condición
+    ANI 41H          ; conserva C3 (bit 6) y C0 (bit 0)
+    CPI 40H
+    JZ IGUALES
+    ANI 01H
+    JNZ MENOR
+    MVI A, 0
+    JMP FIN
+MENOR:   MVI A, 1
+         JMP FIN
+IGUALES: MVI A, 2
+FIN:     STA RESULT
+         HLT
+
+ORG 2000H
+X:      DF 2.5
+Y:      DF 7.0
+RESULT: DS 1
+```
+
+### 6.7 El riesgo de datos: por qué existe `FWAIT`
+
+Este es el concepto más importante del capítulo. Como la FPU trabaja en paralelo, el CPU puede **leer un resultado antes de que exista**:
+
+```assembly
+ORG 0000H
+    FLD X
+    FLD Y
+    FMUL           ; 6 ciclos de latencia
+    FSTP RES       ; la FPU escribirá RES cuando termine
+    LDA RES        ; ¡Riesgo! RES todavía vale 00 → A = 00
+    MOV B, A
+    FWAIT          ; ahora sí esperamos a la FPU
+    LDA RES        ; A = C3H (byte bajo de 3.14)
+    HLT
+
+ORG 2000H
+X:   DF 1.0
+Y:   DF 3.14
+RES: DS 4
+```
+
+Ejecútalo y compara `B` (valor viejo) con `A` (valor correcto). Después desactiva la casilla "Simular latencia" y repite: sin latencia ambos coinciden. Es exactamente el problema que resolvían los programadores del 8087 y que hoy resuelven las unidades de control de los procesadores modernos.
+
+### 6.8 Excepciones: cuando la matemática falla
+
+Dividir entre cero, sacar la raíz de un negativo o multiplicar dos números enormes no detiene al programa: la FPU registra una **excepción** en su palabra de estado y entrega un valor por defecto.
+
+| Excepción | Cuándo | Resultado |
+|---|---|---|
+| `ZE` | `x ÷ 0` con `x ≠ 0` | `±Inf` |
+| `IE` | `√(−4)`, `0 ÷ 0`, comparar con `NaN`, pila vacía o llena | `NaN` |
+| `OE` | resultado mayor que `3.4 × 10³⁸` | `±Inf` |
+| `UE` | resultado demasiado pequeño | `0` o subnormal |
+| `PE` | el resultado tuvo que redondearse (`1 ÷ 3`) | valor redondeado |
+| `SF` | desbordamiento o subdesbordamiento de la pila | `NaN` |
+
+Carga el ejemplo 7 del menú y observa cómo se encienden los LEDs. `FCLEX` los apaga y `FINIT` reinicia el coprocesador por completo.
+
+### 6.9 Modos de redondeo
+
+`FLDCW n` fija el modo de redondeo de la palabra de control: `0` al más cercano (empates al par), `1` hacia −∞ (piso), `2` hacia +∞ (techo), `3` truncar. Afecta a cada resultado y a las conversiones a entero:
+
+```assembly
+    FLD X          ; 2.5
+    FLDCW 0
+    FIST R0        ; 2  (empate → par)
+    FLDCW 2
+    FIST R1        ; 3  (techo)
+    FLDCW 3
+    FISTP R2       ; 2  (truncar)
+```
+
+### 6.10 ¿Y si no hubiera coprocesador?
+
+Desmarca "Coprocesador conectado al bus" y ejecuta cualquier ejemplo: el CPU consume los bytes de cada `ESC`, pero nadie los atiende y los resultados quedan en cero. Así se comportaba un PC sin 8087: el software debía detectar la ausencia del chip y recurrir a rutinas de emulación cientos de veces más lentas.
+
+---
+
+¡Felicidades! Has completado el recorrido completo por el funcionamiento interno del microprocesador y de su coprocesador. Ahora tienes la capacidad intelectual y práctica de diseñar programas de gran rendimiento, depurar flujos paso a paso y, lo más importante, comprender exactamente cómo interactúa el software de alto nivel con el hardware subyacente.
 
 **¡Es hora de experimentar en el simulador!**

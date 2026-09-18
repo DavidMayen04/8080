@@ -1,49 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intel 8080 Emulator & Assembler</title>
+    <title>Intel 8080 + Coprocesador de Punto Flotante</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <header>
         <div class="header-container">
-            <h1>Intel 8080 Emulator & Assembler</h1>
-            <span class="version-badge">Version 2.1</span>
+            <h1>Intel 8080 Emulator &amp; Assembler</h1>
+            <span class="version-badge">Versión 3.0</span>
+            <span class="fpu-badge">+ Coprocesador de Punto Flotante</span>
+            <nav class="header-nav">
+                <a href="#fpu-section">Coprocesador</a>
+                <a href="#arch-section">Arquitectura</a>
+                <a href="INSTRUCTIONS.md" target="_blank" rel="noopener">Guía</a>
+            </nav>
         </div>
     </header>
 
     <main>
+        <!-- ===================== ENSAMBLADOR ===================== -->
         <section id="editor-section">
-            <h2>Assembler</h2>
-            <textarea id="code-editor" spellcheck="false" placeholder="Write your 8080 assembly here...
-Example:
-MVI A, 5
-MVI B, 10
-ADD B
-STA 2000H
-HLT"></textarea>
+            <h2>Ensamblador</h2>
+            <div class="examples-row">
+                <label for="example-select">Ejemplos:</label>
+                <select id="example-select">
+                    <option value="">— Selecciona un programa de ejemplo —</option>
+                </select>
+            </div>
+            <textarea id="code-editor" spellcheck="false" placeholder="Escribe tu ensamblador 8080 aquí...
+Ejemplo con coprocesador:
+    FLD X        ; apila 3.5
+    FLD Y        ; apila 2.0
+    FMUL         ; ST(0) = 7.0
+    FSTP RES     ; guarda y desapila
+    HLT
+X:   DF 3.5
+Y:   DF 2.0
+RES: DS 4"></textarea>
             <div class="controls">
-                <button id="btn-assemble">Assemble & Load</button>
-                <button id="btn-clear-code" class="btn-clear">Clear Code</button>
+                <button id="btn-assemble">Ensamblar y cargar</button>
+                <button id="btn-clear-code" class="btn-clear">Limpiar</button>
             </div>
             <div id="assembler-output"></div>
+
+            <details class="reference">
+                <summary>Referencia rápida del coprocesador (instrucciones, codificación y latencias)</summary>
+                <p>Toda instrucción FPU se codifica como <code>ED</code> (ESC) seguido del opcode del coprocesador
+                   y, si aplica, una dirección de 16 bits o un inmediato. Directivas nuevas:
+                   <code>DF 3.14</code> (float de 32 bits), <code>DW 1000</code> (entero de 16 bits) y
+                   <code>DS n</code> (reservar n bytes).</p>
+                <table id="fpu-reference"></table>
+            </details>
         </section>
 
+        <!-- ===================== CPU ===================== -->
         <section id="emulator-section">
-            <h2>CPU Dashboard</h2>
+            <h2>Panel del CPU</h2>
             <div class="controls">
-                <button id="btn-run">Run</button>
-                <button id="btn-stop">Stop</button>
-                <button id="btn-step">Step</button>
-                <button id="btn-reset">Reset</button>
-                <span id="status-badge">Idle</span>
+                <button id="btn-run">Ejecutar</button>
+                <button id="btn-stop">Detener</button>
+                <button id="btn-step">Paso</button>
+                <button id="btn-reset">Reiniciar</button>
+                <span id="status-badge">Inactivo</span>
             </div>
 
             <div class="cpu-grid">
                 <div class="card registers">
-                    <h3>Registers</h3>
+                    <h3>Registros</h3>
                     <div class="reg-row">
                         <div class="reg-box"><span>A</span><div id="reg-a">00</div></div>
                         <div class="reg-box"><span>Flags</span><div id="reg-f">02</div></div>
@@ -64,11 +90,16 @@ HLT"></textarea>
                         <div class="reg-box extended"><span>PC</span><div id="reg-pc">0000</div></div>
                         <div class="reg-box extended"><span>SP</span><div id="reg-sp">FFFF</div></div>
                     </div>
+                    <div class="reg-row counters">
+                        <div class="reg-box extended"><span>Ciclos CPU</span><div id="cpu-cycles">0</div></div>
+                        <div class="reg-box extended"><span>Ops. FPU</span><div id="fpu-ops">0</div></div>
+                        <div class="reg-box extended"><span>Ciclos WAIT</span><div id="fpu-stalls">0</div></div>
+                    </div>
                 </div>
 
                 <div class="dashboard-right">
                     <div class="card flags">
-                        <h3>Flags</h3>
+                        <h3>Banderas</h3>
                         <div class="flags-row">
                             <div class="flag-box" title="Sign Flag (Signo): Se activa (1) si el bit más significativo (bit 7) del resultado es 1, indicando un número negativo."><span>S</span><div id="flag-s">0</div></div>
                             <div class="flag-box" title="Zero Flag (Cero): Se activa (1) si el resultado de la última operación fue exactamente cero."><span>Z</span><div id="flag-z">0</div></div>
@@ -79,25 +110,236 @@ HLT"></textarea>
                     </div>
 
                     <div class="card stack">
-                        <h3>Stack View (around SP)</h3>
+                        <h3>Pila (alrededor de SP)</h3>
                         <div id="stack-table"></div>
                     </div>
                 </div>
 
                 <div class="card memory">
-                    <h3>Memory View</h3>
+                    <h3>Memoria</h3>
                     <div class="mem-controls">
-                        <input type="text" id="mem-start-addr" value="0000" size="4">
-                        <button id="btn-mem-go">Go</button>
+                        <label>Ir a: <input type="text" id="mem-start-addr" value="0000" size="4"></label>
+                        <button id="btn-mem-go">Ir</button>
+                        <span class="mem-legend"><i class="lg-pc"></i> PC <i class="lg-read"></i> lectura FPU <i class="lg-write"></i> escritura FPU</span>
                     </div>
                     <div id="memory-table"></div>
+                    <div class="float-inspector">
+                        <label>Ver float en: <input type="text" id="float-addr" value="2000" size="4"></label>
+                        <button id="btn-float-inspect">Interpretar</button>
+                        <span id="float-inspect-out">—</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================== COPROCESADOR ===================== -->
+        <section id="fpu-section">
+            <h2>Coprocesador de Punto Flotante <small>(FPU, inspirado en el Intel 8087)</small></h2>
+            <div class="controls fpu-controls">
+                <label class="toggle"><input type="checkbox" id="fpu-enabled" checked> Coprocesador conectado al bus</label>
+                <label class="toggle"><input type="checkbox" id="fpu-latency" checked> Simular latencia</label>
+                <span id="fpu-status" class="fpu-status idle">Listo</span>
+            </div>
+
+            <div class="card bus-card">
+                <h3>Bus CPU ↔ FPU</h3>
+                <svg id="bus-diagram" viewBox="0 0 560 190" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama del bus entre el CPU 8080 y el coprocesador">
+                    <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+                        </marker>
+                    </defs>
+                    <!-- CPU -->
+                    <g id="bus-cpu" class="chip">
+                        <rect x="16" y="40" width="150" height="120" rx="8"/>
+                        <text x="91" y="66" class="chip-title">CPU Intel 8080</text>
+                        <text x="91" y="90" class="chip-line" id="bus-cpu-pc">PC: 0000</text>
+                        <text x="91" y="110" class="chip-line" id="bus-cpu-instr">—</text>
+                        <text x="91" y="142" class="chip-state" id="bus-cpu-state">EJECUTANDO</text>
+                    </g>
+                    <!-- FPU -->
+                    <g id="bus-fpu" class="chip fpu">
+                        <rect x="394" y="40" width="150" height="120" rx="8"/>
+                        <text x="469" y="66" class="chip-title">Coprocesador FPU</text>
+                        <text x="469" y="90" class="chip-line" id="bus-fpu-st0">ST(0): vacío</text>
+                        <text x="469" y="110" class="chip-line" id="bus-fpu-op">—</text>
+                        <text x="469" y="142" class="chip-state" id="bus-fpu-state">LISTO</text>
+                    </g>
+                    <!-- Líneas -->
+                    <g class="bus-line" id="line-esc">
+                        <text x="280" y="62" class="line-label">Instrucción (ESC + opcode)</text>
+                        <line x1="166" y1="70" x2="394" y2="70" marker-end="url(#arrow)"/>
+                    </g>
+                    <g class="bus-line" id="line-data">
+                        <text x="280" y="97" class="line-label">Bus de datos (operandos y resultados)</text>
+                        <line x1="166" y1="105" x2="394" y2="105" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+                    </g>
+                    <g class="bus-line" id="line-wait">
+                        <text x="280" y="132" class="line-label">BUSY → WAIT (sincronización)</text>
+                        <line x1="394" y1="140" x2="166" y2="140" marker-end="url(#arrow)"/>
+                    </g>
+                    <!-- Paquetes animados -->
+                    <circle id="pkt-esc" class="packet esc" r="6" cx="-20" cy="-20">
+                        <animateMotion id="anim-esc" begin="indefinite" dur="0.55s" path="M 166 70 L 394 70" fill="remove"/>
+                    </circle>
+                    <circle id="pkt-data-out" class="packet data" r="6" cx="-20" cy="-20">
+                        <animateMotion id="anim-data-out" begin="indefinite" dur="0.55s" path="M 166 105 L 394 105" fill="remove"/>
+                    </circle>
+                    <circle id="pkt-data-in" class="packet data" r="6" cx="-20" cy="-20">
+                        <animateMotion id="anim-data-in" begin="indefinite" dur="0.55s" path="M 394 105 L 166 105" fill="remove"/>
+                    </circle>
+                    <circle id="pkt-wait" class="packet wait" r="6" cx="-20" cy="-20">
+                        <animateMotion id="anim-wait" begin="indefinite" dur="0.55s" path="M 394 140 L 166 140" fill="remove"/>
+                    </circle>
+                </svg>
+            </div>
+
+            <div class="fpu-grid">
+                <div class="card fpu-stack-card">
+                    <h3>Pila de registros <small>(TOP = <span id="fpu-top">0</span>)</small></h3>
+                    <div id="fpu-stack"></div>
+                    <p class="hint">Haz clic en un registro para ver su representación IEEE 754.</p>
+                </div>
+
+                <div class="card status-card">
+                    <h3>Palabra de estado <small>(<span id="fpu-sw-hex">0000</span>H)</small></h3>
+                    <div class="led-group">
+                        <div class="led-title">Códigos de condición (resultado de FCOM / FTST)</div>
+                        <div class="leds">
+                            <div class="led" id="led-c3" title="C3: ST(0) es igual al operando (equivale a la bandera Z del CPU)."><span>C3</span><b>=</b></div>
+                            <div class="led" id="led-c2" title="C2: comparación no ordenada (algún operando es NaN)."><span>C2</span><b>?</b></div>
+                            <div class="led" id="led-c1" title="C1: dirección del fallo de pila (1 = desbordamiento)."><span>C1</span><b>↕</b></div>
+                            <div class="led" id="led-c0" title="C0: ST(0) es menor que el operando (equivale a la bandera CY del CPU)."><span>C0</span><b>&lt;</b></div>
+                        </div>
+                    </div>
+                    <div class="led-group">
+                        <div class="led-title">Excepciones</div>
+                        <div class="leds">
+                            <div class="led exc" id="led-ie" title="IE (Invalid): operación inválida: √ de negativo, 0/0, ∞−∞, comparación con NaN, fallo de pila."><span>IE</span><b>Inválida</b></div>
+                            <div class="led exc" id="led-de" title="DE (Denormal): el resultado es un número subnormal (muy pequeño, sin bit implícito)."><span>DE</span><b>Denormal</b></div>
+                            <div class="led exc" id="led-ze" title="ZE (Zero divide): división de un número finito entre cero. Resultado ±∞."><span>ZE</span><b>÷ 0</b></div>
+                            <div class="led exc" id="led-oe" title="OE (Overflow): el resultado supera el máximo representable (≈3.4×10³⁸). Resultado ±∞."><span>OE</span><b>Overflow</b></div>
+                            <div class="led exc" id="led-ue" title="UE (Underflow): el resultado es demasiado pequeño para representarse con precisión."><span>UE</span><b>Underflow</b></div>
+                            <div class="led exc" id="led-pe" title="PE (Precision): el resultado tuvo que redondearse (es inexacto)."><span>PE</span><b>Inexacto</b></div>
+                            <div class="led exc" id="led-sf" title="SF (Stack Fault): desbordamiento o subdesbordamiento de la pila de registros."><span>SF</span><b>Pila</b></div>
+                        </div>
+                    </div>
+                    <div class="control-row">
+                        <label>Palabra de control · Redondeo (RC):
+                            <select id="fpu-rc">
+                                <option value="0">0 · Al más cercano (par)</option>
+                                <option value="1">1 · Hacia −∞ (piso)</option>
+                                <option value="2">2 · Hacia +∞ (techo)</option>
+                                <option value="3">3 · Truncar (hacia 0)</option>
+                            </select>
+                        </label>
+                        <button id="btn-fpu-clex" class="btn-small">FCLEX</button>
+                        <button id="btn-fpu-init" class="btn-small">FINIT</button>
+                    </div>
+                </div>
+
+                <div class="card ieee-card">
+                    <h3>Representación IEEE 754 (32 bits) <small id="ieee-source">— ST(0)</small></h3>
+                    <div class="ieee-input">
+                        <label>Probar valor: <input type="text" id="ieee-manual" placeholder="ej. -6.25"></label>
+                        <button id="btn-ieee-st0" class="btn-small">Seguir ST(0)</button>
+                    </div>
+                    <div id="ieee-bits" class="ieee-bits"></div>
+                    <div class="ieee-legend">
+                        <span><i class="sw-sign"></i> Signo (1 bit)</span>
+                        <span><i class="sw-exp"></i> Exponente (8 bits, sesgo 127)</span>
+                        <span><i class="sw-man"></i> Mantisa (23 bits + 1 implícito)</span>
+                    </div>
+                    <div id="ieee-detail" class="ieee-detail"></div>
+                </div>
+
+                <div class="card trace-card">
+                    <h3>Traza del coprocesador</h3>
+                    <div id="fpu-trace"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================== ARQUITECTURA ===================== -->
+        <section id="arch-section">
+            <h2>¿Cómo se integra el coprocesador?</h2>
+            <div class="arch-grid">
+                <div class="arch-text">
+                    <h3>1. Instrucción de escape (ESC)</h3>
+                    <p>El Intel 8080 no tiene hardware de punto flotante ni espacio en su juego de instrucciones.
+                       Se aprovecha el opcode no documentado <code>EDH</code> como <strong>prefijo de escape</strong>,
+                       igual que el 8086 usa <code>ESC</code> para el 8087. El CPU reconoce el prefijo y, en lugar de
+                       ejecutar, actúa como <em>intermediario</em>: obtiene el opcode del coprocesador y, si la instrucción
+                       lo requiere, calcula la <strong>dirección efectiva</strong> (2 bytes inmediatos o el par
+                       <code>HL</code> cuando el operando es <code>M</code>) y lee el operando de memoria.</p>
+
+                    <h3>2. Formato de instrucción</h3>
+                    <table class="format-table">
+                        <tr><th>Forma</th><th>Bytes</th><th>Ejemplo</th></tr>
+                        <tr><td>Pila</td><td><code>ED op</code></td><td><code>FADD</code> → <code>ED 80</code></td></tr>
+                        <tr><td>Memoria directa</td><td><code>ED op lo hi</code></td><td><code>FLD 2000H</code> → <code>ED 00 00 20</code></td></tr>
+                        <tr><td>Memoria vía HL</td><td><code>ED (40H|op)</code></td><td><code>FLD M</code> → <code>ED 40</code></td></tr>
+                        <tr><td>Par de registros</td><td><code>ED (10H|grupo|rp)</code></td><td><code>FILD HL</code> → <code>ED 12</code></td></tr>
+                        <tr><td>Inmediato</td><td><code>ED op imm</code></td><td><code>FLDCW 3</code> → <code>ED 98 03</code></td></tr>
+                    </table>
+
+                    <h3>3. Sincronización: BUSY y WAIT</h3>
+                    <p>Cada operación tarda un número de ciclos (una suma 4, una división 10, una raíz 12, un seno 20).
+                       Durante ese tiempo el coprocesador mantiene activa su línea <strong>BUSY</strong> y el CPU sigue
+                       ejecutando instrucciones enteras en paralelo. Si el CPU encuentra otro <code>ESC</code> mientras
+                       BUSY está activa, entra en <strong>WAIT</strong> y no avanza el <code>PC</code> hasta que la
+                       operación termine. La instrucción <code>FWAIT</code> fuerza esa espera explícitamente: es
+                       obligatoria antes de leer con el CPU un resultado que la FPU escribe en memoria (<code>FST</code>),
+                       de lo contrario se lee el valor viejo (riesgo de datos).</p>
+
+                    <h3>4. Comunicación de resultados</h3>
+                    <p>Los resultados viven en la pila de la FPU. Para que el CPU los use hay tres caminos:
+                       escribirlos en memoria (<code>FST</code>/<code>FSTP</code>), convertirlos a entero en un par de
+                       registros (<code>FIST BC</code>) o transferir la palabra de estado al acumulador
+                       (<code>FSTSW</code>) para bifurcar tras una comparación: <code>C3</code> queda en el bit 6 y
+                       <code>C0</code> en el bit 0, por lo que <code>ANI 40H</code> / <code>JNZ</code> prueba igualdad y
+                       <code>RAR</code> / <code>JC</code> prueba "menor que".</p>
+                </div>
+                <div class="arch-text">
+                    <h3>5. Formato IEEE 754 de precisión simple</h3>
+                    <p>Cada valor ocupa 4 bytes en memoria (little-endian, como los enteros de 16 bits del 8080).
+                       Se interpreta como <strong>(−1)<sup>S</sup> × 1.M × 2<sup>(E − 127)</sup></strong>.
+                       Con E = 0 el número es cero o subnormal; con E = 255 es ±∞ (M = 0) o NaN (M ≠ 0).
+                       La directiva <code>DF</code> del ensamblador genera estos 4 bytes; el panel de la derecha
+                       muestra la descomposición bit a bit de cualquier registro.</p>
+
+                    <h3>6. Pila de registros y etiquetas</h3>
+                    <p>La FPU tiene 8 registros físicos R0..R7 y un puntero <strong>TOP</strong>. Los programas los
+                       ven de forma relativa: <code>ST(0)</code> es la cima, <code>ST(1)</code> el siguiente, etc.
+                       Un <em>push</em> decrementa TOP y un <em>pop</em> lo incrementa. Cada registro lleva una
+                       etiqueta (válido, cero, especial o vacío); usar un registro vacío o apilar un noveno valor
+                       provoca la excepción de pila <code>SF</code>.</p>
+
+                    <h3>7. Excepciones y redondeo</h3>
+                    <p>La FPU nunca detiene al CPU por un error: registra la excepción en su palabra de estado
+                       (IE, DE, ZE, OE, UE, PE, SF) y entrega un resultado por defecto (NaN, ±∞ o el valor redondeado).
+                       El programa decide qué hacer leyendo el estado. La palabra de control fija el modo de
+                       redondeo (<code>FLDCW</code>): al más cercano, hacia −∞, hacia +∞ o truncar, y afecta a
+                       cada resultado y a las conversiones a entero (<code>FIST</code>, <code>FRNDINT</code>).</p>
+
+                    <h3>8. Desconectar el coprocesador</h3>
+                    <p>Con la casilla "Coprocesador conectado al bus" apagada, el CPU consume los bytes de cada
+                       <code>ESC</code> pero nadie los atiende: la instrucción se comporta como <code>NOP</code> y el
+                       programa termina con resultados vacíos. Es la forma de comprobar que sin coprocesador un 8080
+                       tendría que emular la aritmética flotante por software, cientos de instrucciones por operación.</p>
                 </div>
             </div>
         </section>
     </main>
 
+    <footer>
+        <span>Emulador Intel 8080 v3.0 · Coprocesador de punto flotante conceptual · HTML5 + CSS3 + JavaScript puro</span>
+    </footer>
+
     <script src="cpu.js"></script>
+    <script src="fpu.js"></script>
     <script src="assembler.js"></script>
+    <script src="examples.js"></script>
     <script src="main.js"></script>
 </body>
 </html>
