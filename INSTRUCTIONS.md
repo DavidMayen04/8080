@@ -635,7 +635,7 @@ Dividir entre cero, sacar la raíz de un negativo o multiplicar dos números eno
 | `PE` | el resultado tuvo que redondearse (`1 ÷ 3`) | valor redondeado |
 | `SF` | desbordamiento o subdesbordamiento de la pila | `NaN` |
 
-Carga el ejemplo 7 del menú y observa cómo se encienden los LEDs. `FCLEX` los apaga y `FINIT` reinicia el coprocesador por completo.
+Carga el ejemplo 5 del menú y observa cómo se encienden los LEDs. `FCLEX` los apaga y `FINIT` reinicia el coprocesador por completo.
 
 ### 6.9 Modos de redondeo
 

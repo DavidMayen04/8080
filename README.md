@@ -36,7 +36,7 @@ El Intel 8080 sólo opera con enteros de 8 bits. Esta versión le acopla un **co
 - **Palabra de estado:** códigos de condición `C0..C3` (resultado de comparaciones) y excepciones `IE, DE, ZE, OE, UE, PE, SF`. **Palabra de control:** cuatro modos de redondeo (`FLDCW`).
 - **Latencia y sincronización:** cada operación tarda ciclos (suma 4, división 10, raíz 12, seno 20). El CPU sigue ejecutando instrucciones enteras en paralelo y sólo entra en `WAIT` si emite otro `ESC` mientras la línea `BUSY` está activa. `FWAIT` evita el riesgo de leer un resultado antes de que la FPU lo escriba.
 - **Panel gráfico del coprocesador:** diagrama de bus animado CPU ↔ FPU, pila de registros, decodificador IEEE 754 bit a bit (signo, exponente, mantisa, fórmula y bytes en memoria), LEDs de estado, traza de operaciones, contadores de ciclos/esperas, interruptores para desconectar el coprocesador o desactivar la latencia, y un inspector de floats en la vista de memoria.
-- **11 programas de ejemplo** cargables desde el editor (suma, área de un círculo, Celsius→Fahrenheit, hipotenusa, promedio de un arreglo, comparación y salto, excepciones, riesgo de datos con `FWAIT`, trigonometría, modos de redondeo).
+- **7 programas de ejemplo** cargables desde el editor (suma, Celsius→Fahrenheit, riesgo de datos con `FWAIT`, comparación y salto, excepciones, área de un círculo, modos de redondeo).
 - **9 pruebas unitarias nuevas** en `test.js` (`node test.js`).
 
 Consulta el capítulo 6 de `INSTRUCTIONS.md` para la guía paso a paso y la sección "¿Cómo se integra el coprocesador?" del sitio para el modelo arquitectónico.

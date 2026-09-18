@@ -22,27 +22,8 @@ RES: DS 4        ; reserva 4 bytes para el resultado
 `
     },
     {
-        id: 'circulo',
-        title: '2. Área de un círculo (π · r²)',
-        code: `; Área de un círculo: AREA = π × r × r
-ORG 0000H
-    FLDPI        ; ST(0) = π
-    FLD RADIO    ; ST(0) = r,  ST(1) = π
-    FDUP         ; ST(0) = r,  ST(1) = r,  ST(2) = π
-    FMUL         ; ST(0) = r², ST(1) = π
-    FMUL         ; ST(0) = π·r²
-    FSTP AREA    ; guarda el resultado (19.634954)
-    FWAIT
-    HLT
-
-ORG 2000H
-RADIO: DF 2.5
-AREA:  DS 4
-`
-    },
-    {
         id: 'celsius',
-        title: '3. Celsius a Fahrenheit (enteros ↔ flotantes)',
+        title: '2. Celsius a Fahrenheit (enteros ↔ flotantes)',
         code: `; Convierte una temperatura entera en °C a °F
 ; F = C × 1.8 + 32   (37 °C → 98.6 °F)
 ORG 0000H
@@ -62,57 +43,30 @@ FAHR:   DS 4
 `
     },
     {
-        id: 'hipotenusa',
-        title: '4. Hipotenusa con raíz cuadrada',
-        code: `; Teorema de Pitágoras: c = √(a² + b²)
+        id: 'latencia',
+        title: '3. Latencia y FWAIT (riesgo de datos)',
+        code: `; ¿Por qué hace falta FWAIT antes de leer un resultado de la FPU?
+; B recibe el valor viejo; A el correcto.
 ORG 0000H
-    FLD A_LADO     ; ST(0) = 3.0
-    FDUP           ; ST(0) = 3.0, ST(1) = 3.0
-    FMUL           ; ST(0) = 9.0
-    FLD B_LADO     ; ST(0) = 4.0, ST(1) = 9.0
-    FDUP
-    FMUL           ; ST(0) = 16.0, ST(1) = 9.0
-    FADD           ; ST(0) = 25.0
-    FSQRT          ; ST(0) = 5.0
-    FSTP HIPOT
-    FWAIT
+    FLD X
+    FLD Y
+    FMUL           ; 6 ciclos de latencia (ST(0) = 3.14)
+    FSTP RES       ; la FPU escribirá RES cuando termine (2 ciclos)
+    LDA RES        ; ¡Riesgo! RES aún no fue escrito → A = 00
+    MOV B, A       ; B conserva el valor viejo (00)
+    FWAIT          ; espera a que la FPU termine de escribir
+    LDA RES        ; ahora sí: A = C3H (byte bajo de 3.14 = 4048F5C3H)
     HLT
 
 ORG 2000H
-A_LADO: DF 3.0
-B_LADO: DF 4.0
-HIPOT:  DS 4
-`
-    },
-    {
-        id: 'promedio',
-        title: '5. Promedio de un arreglo (bucle con FADD M)',
-        code: `; Promedio de 4 valores flotantes recorridos con HL
-ORG 0000H
-    LXI HL, DATOS    ; HL apunta al primer float
-    LXI DE, 4        ; tamaño de un float (4 bytes)
-    MVI C, 4         ; contador de elementos
-    FLDZ             ; acumulador: ST(0) = 0.0
-BUCLE:
-    FADD M           ; ST(0) = ST(0) + [HL]
-    DAD DE           ; HL = HL + 4 (siguiente float)
-    DCR C
-    JNZ BUCLE
-    FILD CANT        ; apila 4.0 (entero 4 convertido)
-    FDIV             ; ST(0) = suma / 4 = 3.0
-    FSTP PROM
-    FWAIT
-    HLT
-
-ORG 2000H
-DATOS: DF 1.5, 2.5, 3.5, 4.5
-CANT:  DW 4
-PROM:  DS 4
+X:   DF 1.0
+Y:   DF 3.14
+RES: DS 4
 `
     },
     {
         id: 'comparar',
-        title: '6. Comparación y salto condicional (FCOM + FSTSW)',
+        title: '4. Comparación y salto condicional (FCOM + FSTSW)',
         code: `; Compara X con Y y deja en RESULT:
 ;   1 si X < Y,  2 si X = Y,  0 si X > Y
 ORG 0000H
@@ -144,7 +98,7 @@ RESULT: DS 1
     },
     {
         id: 'excepciones',
-        title: '7. Excepciones: ÷0, √negativo, overflow, inexacto',
+        title: '5. Excepciones: ÷0, √negativo, overflow, inexacto',
         code: `; Provoca excepciones y observa la palabra de estado
 ORG 0000H
     FLD1
@@ -173,54 +127,27 @@ ESTADO: DS 2
 `
     },
     {
-        id: 'latencia',
-        title: '8. Latencia y FWAIT (riesgo de datos)',
-        code: `; ¿Por qué hace falta FWAIT antes de leer un resultado de la FPU?
-; B recibe el valor viejo; A el correcto.
+        id: 'circulo',
+        title: '6. Área de un círculo (π · r²)',
+        code: `; Área de un círculo: AREA = π × r × r
 ORG 0000H
-    FLD X
-    FLD Y
-    FMUL           ; 6 ciclos de latencia (ST(0) = 3.14)
-    FSTP RES       ; la FPU escribirá RES cuando termine (2 ciclos)
-    LDA RES        ; ¡Riesgo! RES aún no fue escrito → A = 00
-    MOV B, A       ; B conserva el valor viejo (00)
-    FWAIT          ; espera a que la FPU termine de escribir
-    LDA RES        ; ahora sí: A = C3H (byte bajo de 3.14 = 4048F5C3H)
-    HLT
-
-ORG 2000H
-X:   DF 1.0
-Y:   DF 3.14
-RES: DS 4
-`
-    },
-    {
-        id: 'trig',
-        title: '9. Trigonometría: sen²(x) + cos²(x) = 1',
-        code: `; Identidad pitagórica con FSIN, FCOS y FXCH
-ORG 0000H
-    FLD ANG       ; ST(0) = x
-    FDUP          ; ST(0) = x, ST(1) = x
-    FSIN          ; ST(0) = sen x
-    FDUP
-    FMUL          ; ST(0) = sen² x, ST(1) = x
-    FXCH          ; ST(0) = x, ST(1) = sen² x
-    FCOS          ; ST(0) = cos x
-    FDUP
-    FMUL          ; ST(0) = cos² x
-    FADD          ; ST(0) = sen² x + cos² x ≈ 1.0
-    FSTP RES
+    FLDPI        ; ST(0) = π
+    FLD RADIO    ; ST(0) = r,  ST(1) = π
+    FDUP         ; ST(0) = r,  ST(1) = r,  ST(2) = π
+    FMUL         ; ST(0) = r², ST(1) = π
+    FMUL         ; ST(0) = π·r²
+    FSTP AREA    ; guarda el resultado (19.634954)
     FWAIT
     HLT
 
 ORG 2000H
-ANG: DF 0.7853982   ; π/4 radianes
-RES: DS 4
+RADIO: DF 2.5
+AREA:  DS 4
 `
     },
     {
         id: 'redondeo',
-        title: '10. Modos de redondeo (FLDCW + FIST)',
+        title: '7. Modos de redondeo (FLDCW + FIST)',
         code: `; Convierte 2.5 a entero con los cuatro modos de redondeo
 ORG 0000H
     FLD X            ; ST(0) = 2.5
@@ -241,17 +168,6 @@ R0: DS 2
 R1: DS 2
 R2: DS 2
 R3: DS 2
-`
-    },
-    {
-        id: 'enteros',
-        title: '11. Programa clásico sin coprocesador',
-        code: `; Suma entera de 8 bits (solo CPU)
-MVI A, 5
-MVI B, 10
-ADD B
-STA 2000H
-HLT
 `
     }
 ];
