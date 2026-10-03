@@ -72,6 +72,290 @@ GRANDE: DF 1e30
 TRES:   DF 3.0
 ESTADO: DS 2
 `
+    },
+    {
+        id: 'calibracion',
+        title: '4. Calibración de sensor (mínimos cuadrados)',
+        code: `ORG 0000H
+INICIO: LXI SP, 3000H
+    FINIT
+    FILD NPARES
+    FSTP NF
+    FLDZ
+    FST SX
+    FST SY
+    FST SXX
+    FST SXY
+    FSTP SSE
+    LXI H, PARES
+    LDA NPARES
+    MOV B, A
+SUMAS: FLD SX
+    FADD M
+    FSTP SX
+    FLD M
+    FMUL M
+    FADD SXX
+    FSTP SXX
+    FLD M
+    CALL AVANZA
+    FMUL M
+    FADD SXY
+    FSTP SXY
+    FLD SY
+    FADD M
+    FSTP SY
+    CALL AVANZA
+    DCR B
+    JNZ SUMAS
+    FLD NF
+    FMUL SXX
+    FLD SX
+    FMUL SX
+    FSUB
+    FTST
+    FSTSW
+    ANI 40H
+    JNZ ERROR
+    FSTP DEN
+    FLD NF
+    FMUL SXY
+    FLD SX
+    FMUL SY
+    FSUB
+    FDIV DEN
+    FST PEND
+    FMUL SX
+    FLD SY
+    FXCH
+    FSUB
+    FDIV NF
+    FSTP INTER
+    LXI H, PARES
+    LDA NPARES
+    MOV B, A
+RESID: FLD M
+    FMUL PEND
+    FADD INTER
+    CALL AVANZA
+    FSUB M
+    FDUP
+    FMUL
+    FADD SSE
+    FSTP SSE
+    CALL AVANZA
+    DCR B
+    JNZ RESID
+    FLD SSE
+    FDIV NF
+    FSQRT
+    FST RMSE
+    FCOM LIMITE
+    FSTSW
+    FPOP
+    ANI 01H
+    MOV C, A
+    LXI H, LECTURAS
+    LXI D, CORREGIDAS
+    LDA NLECTURAS
+    MOV B, A
+CORREGIR: FLD M
+    FMUL PEND
+    FADD INTER
+    XCHG
+    FSTP M
+    CALL AVANZA
+    XCHG
+    CALL AVANZA
+    DCR B
+    JNZ CORREGIR
+    MOV A, C
+    ORA A
+    JZ ERROR
+    MVI A, 01H
+    JMP FIN
+ERROR: FINIT
+    MVI A, 0FFH
+FIN: FWAIT
+    STA ESTADO
+    HLT
+AVANZA: INX H
+    INX H
+    INX H
+    INX H
+    RET
+
+ORG 2000H
+PARES: DF 10.0, 15.0
+    DF 20.0, 24.0
+    DF 30.0, 38.0
+    DF 40.0, 45.0
+    DF 50.0, 65.0
+
+ORG 2030H
+LECTURAS: DF 16.25, 27.5, 38.75, 42.0
+
+ORG 2040H
+PEND: DS 4
+INTER: DS 4
+RMSE: DS 4
+CORREGIDAS: DS 16
+ESTADO: DS 1
+
+ORG 2060H
+NPARES: DW 5
+NLECTURAS: DB 4
+LIMITE: DF 3.0
+NF: DS 4
+SX: DS 4
+SY: DS 4
+SXX: DS 4
+SXY: DS 4
+DEN: DS 4
+SSE: DS 4
+`
+    },
+    {
+        id: 'calibracion-error',
+        title: '5. Calibración con x iguales (división por cero)',
+        code: `ORG 0000H
+INICIO: LXI SP, 3000H
+    FINIT
+    FILD NPARES
+    FSTP NF
+    FLDZ
+    FST SX
+    FST SY
+    FST SXX
+    FST SXY
+    FSTP SSE
+    LXI H, PARES
+    LDA NPARES
+    MOV B, A
+SUMAS: FLD SX
+    FADD M
+    FSTP SX
+    FLD M
+    FMUL M
+    FADD SXX
+    FSTP SXX
+    FLD M
+    CALL AVANZA
+    FMUL M
+    FADD SXY
+    FSTP SXY
+    FLD SY
+    FADD M
+    FSTP SY
+    CALL AVANZA
+    DCR B
+    JNZ SUMAS
+    FLD NF
+    FMUL SXX
+    FLD SX
+    FMUL SX
+    FSUB
+    FTST
+    FSTSW
+    ANI 40H
+    JNZ ERROR
+    FSTP DEN
+    FLD NF
+    FMUL SXY
+    FLD SX
+    FMUL SY
+    FSUB
+    FDIV DEN
+    FST PEND
+    FMUL SX
+    FLD SY
+    FXCH
+    FSUB
+    FDIV NF
+    FSTP INTER
+    LXI H, PARES
+    LDA NPARES
+    MOV B, A
+RESID: FLD M
+    FMUL PEND
+    FADD INTER
+    CALL AVANZA
+    FSUB M
+    FDUP
+    FMUL
+    FADD SSE
+    FSTP SSE
+    CALL AVANZA
+    DCR B
+    JNZ RESID
+    FLD SSE
+    FDIV NF
+    FSQRT
+    FST RMSE
+    FCOM LIMITE
+    FSTSW
+    FPOP
+    ANI 01H
+    MOV C, A
+    LXI H, LECTURAS
+    LXI D, CORREGIDAS
+    LDA NLECTURAS
+    MOV B, A
+CORREGIR: FLD M
+    FMUL PEND
+    FADD INTER
+    XCHG
+    FSTP M
+    CALL AVANZA
+    XCHG
+    CALL AVANZA
+    DCR B
+    JNZ CORREGIR
+    MOV A, C
+    ORA A
+    JZ ERROR
+    MVI A, 01H
+    JMP FIN
+ERROR: FINIT
+    MVI A, 0FFH
+FIN: FWAIT
+    STA ESTADO
+    HLT
+AVANZA: INX H
+    INX H
+    INX H
+    INX H
+    RET
+
+ORG 2000H
+PARES: DF 10.0, 15.0
+    DF 10.0, 24.0
+    DF 10.0, 38.0
+    DF 10.0, 45.0
+    DF 10.0, 65.0
+
+ORG 2030H
+LECTURAS: DF 16.25, 27.5, 38.75, 42.0
+
+ORG 2040H
+PEND: DS 4
+INTER: DS 4
+RMSE: DS 4
+CORREGIDAS: DS 16
+ESTADO: DS 1
+
+ORG 2060H
+NPARES: DW 5
+NLECTURAS: DB 4
+LIMITE: DF 3.0
+NF: DS 4
+SX: DS 4
+SY: DS 4
+SXX: DS 4
+SXY: DS 4
+DEN: DS 4
+SSE: DS 4
+`
     }
 ];
 

@@ -379,4 +379,20 @@ runTest('FPU: All bundled example programs assemble, run and halt', () => {
     assert.deepStrictEqual([exc.fpu.exc.ze, exc.fpu.exc.ie, exc.fpu.exc.oe, exc.fpu.exc.pe], [true, true, true, true]);
 });
 
+runTest('FPU: Sensor calibration by least squares', () => {
+    const near = (v, e, tol) => assert.ok(Math.abs(v - e) < tol, `${v} != ${e}`);
+    const ok = makeSystem(EXAMPLES.find(e => e.id === 'calibracion').code);
+    runUntilHalt(ok.cpu, ok.fpu);
+    near(ok.fpu.readFloat(ok.cpu, 0x2040), 1.21, 1e-5);
+    near(ok.fpu.readFloat(ok.cpu, 0x2044), 1.10, 1e-5);
+    near(ok.fpu.readFloat(ok.cpu, 0x2048), Math.sqrt(37.1 / 5), 1e-5);
+    [20.7625, 34.375, 47.9875, 51.92].forEach((v, i) => near(ok.fpu.readFloat(ok.cpu, 0x204C + i * 4), v, 1e-4));
+    assert.strictEqual(ok.cpu.memory[0x205C], 0x01);
+
+    const err = makeSystem(EXAMPLES.find(e => e.id === 'calibracion-error').code);
+    runUntilHalt(err.cpu, err.fpu);
+    assert.strictEqual(err.cpu.halted, true);
+    assert.strictEqual(err.cpu.memory[0x205C], 0xFF);
+});
+
 console.log('All tests completed successfully!');
